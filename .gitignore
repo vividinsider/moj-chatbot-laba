@@ -1,0 +1,19 @@
+# zależności
+node_modules/
+
+# build Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# sekrety
+.env
+.env.*
+!.env.example
+
+# logi
+npm-debug.log*
+
+# Vercel
+.vercel/
