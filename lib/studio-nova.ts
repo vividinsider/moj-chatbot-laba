@@ -29,3 +29,13 @@ Klient: Nie mogę się zalogować.
 Kategoria: support
 Szkic: Napisz proszę, jaki komunikat pojawia się podczas logowania.
 Do sprawdzenia: przyczyna problemu z logowaniem; needs_review = true.`;
+
+export const ANALYSIS_RULES = `Tryb analizy wiadomości:
+Zamiast zwykłego tekstu zwracasz wyłącznie pola category, priority, draft i needs_review.
+category: sales = oferta i cena; support = problem techniczny; billing = płatność lub zwrot;
+unknown = brak rozpoznanej sprawy.
+priority: high tylko przy blokadzie opłaconego spotkania zaczynającego się w ciągu godziny.
+Pozostałe wiadomości: normal.
+needs_review: true przy braku danych lub konieczności decyzji pracownika.
+draft: szkic odpowiedzi do klienta po polsku. Każdy wynik jest szkicem,
+także gdy needs_review = false.`;

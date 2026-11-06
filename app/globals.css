@@ -112,3 +112,68 @@ h1 {
   margin: 0 auto;
   padding: 24px 16px;
 }
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+a.logout {
+  text-decoration: none;
+}
+
+.analyze-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.analyze-form textarea {
+  padding: 12px;
+  font: inherit;
+  border: 1px solid #c8c8cc;
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.analyze-form button {
+  align-self: flex-end;
+  padding: 12px 20px;
+  font: inherit;
+  color: #fff;
+  background: #1c1c1e;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.analyze-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.analysis {
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #e0e0e3;
+  border-radius: 8px;
+}
+
+.analysis dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+  margin: 0 0 12px;
+}
+
+.analysis dt {
+  color: #6e6e73;
+}
+
+.analysis dd {
+  margin: 0;
+}
+
+.analysis .draft {
+  white-space: pre-wrap;
+}

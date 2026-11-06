@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 export default function Chat() {
@@ -25,9 +26,14 @@ export default function Chat() {
     <main className="chat">
       <header className="chat-header">
         <h1>Mój chatbot</h1>
-        <button type="button" className="logout" onClick={handleLogout}>
-          Wyjdź
-        </button>
+        <nav className="header-actions">
+          <Link className="logout" href="/analiza">
+            Analiza
+          </Link>
+          <button type="button" className="logout" onClick={handleLogout}>
+            Wyjdź
+          </button>
+        </nav>
       </header>
 
       <section className="messages" aria-label="Rozmowa">
