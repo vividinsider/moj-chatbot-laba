@@ -7,6 +7,7 @@ import {
 } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { hasValidSession } from "@/lib/session";
+import { STUDIO_NOVA_INSTRUCTIONS } from "@/lib/studio-nova";
 
 export async function POST(req: Request) {
   if (!(await hasValidSession())) {
@@ -28,6 +29,7 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: openrouter.chat(model),
+    instructions: STUDIO_NOVA_INSTRUCTIONS,
     messages: await convertToModelMessages(messages),
   });
 
