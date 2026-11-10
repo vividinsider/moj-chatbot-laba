@@ -16,6 +16,12 @@ type ToolPart = {
   errorText?: string;
 };
 
+const TOOL_LABELS: Record<string, string> = {
+  "tool-generujObraz": "🎨 generujObraz",
+  "tool-wycenaKonsultacji": "🧮 wycenaKonsultacji",
+  "tool-cenaWWalucie": "💱 cenaWWalucie",
+};
+
 const transport = new DefaultChatTransport({ api: "/api/agent", body: { mode: "chat" } });
 
 function formatFetchedAt(fetchedAt: string | undefined) {
@@ -93,9 +99,22 @@ export default function Chat() {
           const metadata = message.metadata as Metadata;
           const sources = message.parts.filter((part) => part.type === "source-url");
           const fetchedAt = formatFetchedAt(metadata?.fetchedAt);
+          const toolLabels = [
+            ...(sources.length > 0 ? ["🔎 wyszukiwanie"] : []),
+            ...new Set(message.parts.map((part) => TOOL_LABELS[part.type]).filter(Boolean)),
+          ];
 
           return (
             <div key={message.id} className={`message ${message.role}`}>
+              {toolLabels.length > 0 && (
+                <div className="tool-labels">
+                  {toolLabels.map((label) => (
+                    <span key={label} className="tool-label">
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              )}
               {message.parts.map((part, index) => {
                 if (part.type === "text") return <span key={index}>{part.text}</span>;
                 if (part.type === "file" && part.mediaType.startsWith("image/")) {

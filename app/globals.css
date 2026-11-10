@@ -246,3 +246,18 @@ a.logout {
   text-decoration: underline;
   cursor: pointer;
 }
+
+.tool-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+  white-space: normal;
+}
+
+.tool-label {
+  padding: 2px 8px;
+  font-size: 12px;
+  background: #e4e9f7;
+  border-radius: 999px;
+}

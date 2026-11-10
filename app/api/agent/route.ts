@@ -13,7 +13,13 @@ import {
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
 import { hasValidSession } from "@/lib/session";
-import { ANALYSIS_RULES, SEARCH_RULES, STUDIO_NOVA_INSTRUCTIONS } from "@/lib/studio-nova";
+import {
+  ANALYSIS_RULES,
+  SEARCH_RULES,
+  STUDIO_NOVA_INSTRUCTIONS,
+  TOOL_RULES,
+} from "@/lib/studio-nova";
+import { cenaWWalucie, wycenaKonsultacji } from "@/lib/tools";
 import {
   analysisSchema,
   describeAnalysisError,
@@ -52,6 +58,8 @@ function createTools(openrouter: OpenRouter) {
       // Obraz trafia do przeglądarki, a model dostaje tylko krótką informację.
       toModelOutput: () => ({ type: "text", value: "obraz wygenerowany" }),
     }),
+    wycenaKonsultacji,
+    cenaWWalucie,
   };
 }
 
@@ -60,7 +68,7 @@ async function chat(openrouter: OpenRouter, model: string, messages: UIMessage[]
 
   const result = streamText({
     model: openrouter.chat(model),
-    instructions: `${STUDIO_NOVA_INSTRUCTIONS}\n\n${SEARCH_RULES}`,
+    instructions: `${STUDIO_NOVA_INSTRUCTIONS}\n\n${SEARCH_RULES}\n\n${TOOL_RULES}`,
     messages: await convertToModelMessages(messages, { tools }),
     tools,
     stopWhen: isStepCount(5),

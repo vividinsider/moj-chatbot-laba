@@ -48,3 +48,7 @@ export const SEARCH_RULES = `Wyszukiwanie w internecie:
 Gdy pytanie dotyczy aktualnych wydarzeń, cen, kursów, dat lub faktów,
 których nie jesteś pewien, użyj wyszukiwania i oprzyj odpowiedź na źródłach.
 Ceny usług Studio Nova podawaj wyłącznie z informacji firmy.`;
+export const TOOL_RULES = `Narzędzia Studio Nova:
+Do wyceny kilku konsultacji i kwoty po zaliczce używaj narzędzia wycenaKonsultacji.
+Do ceny konsultacji w walucie obcej używaj narzędzia cenaWWalucie i podaj datę kursu NBP.
+Nie licz tych kwot samodzielnie.`;
