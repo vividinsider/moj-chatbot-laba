@@ -199,3 +199,50 @@ a.logout {
 .sources small {
   color: #6e6e73;
 }
+.thumbnail {
+  display: block;
+  max-width: 200px;
+  max-height: 200px;
+  margin-top: 8px;
+  border-radius: 6px;
+}
+
+.generated {
+  display: block;
+  margin-top: 8px;
+}
+
+.generated img {
+  display: block;
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: 6px;
+}
+
+.model {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6e6e73;
+  white-space: normal;
+}
+
+.message.user .model {
+  color: #c8c8cc;
+}
+
+.composer button.secondary {
+  color: #1c1c1e;
+  background: #fff;
+  border: 1px solid #c8c8cc;
+}
+
+.link-button {
+  padding: 0;
+  font: inherit;
+  color: #0b57d0;
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
