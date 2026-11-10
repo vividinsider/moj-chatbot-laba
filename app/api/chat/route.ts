@@ -1,13 +1,14 @@
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
+  isStepCount,
   streamText,
   toUIMessageStream,
   type UIMessage,
 } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { hasValidSession } from "@/lib/session";
-import { STUDIO_NOVA_INSTRUCTIONS } from "@/lib/studio-nova";
+import { SEARCH_RULES, STUDIO_NOVA_INSTRUCTIONS } from "@/lib/studio-nova";
 
 export async function POST(req: Request) {
   if (!(await hasValidSession())) {
@@ -29,11 +30,20 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: openrouter.chat(model),
-    instructions: STUDIO_NOVA_INSTRUCTIONS,
+    instructions: `${STUDIO_NOVA_INSTRUCTIONS}\n\n${SEARCH_RULES}`,
     messages: await convertToModelMessages(messages),
+    tools: {
+      wyszukiwanie: openrouter.tools.webSearch({ maxResults: 3, engine: "native" }),
+    },
+    stopWhen: isStepCount(5),
   });
 
   return createUIMessageStreamResponse({
-    stream: toUIMessageStream({ stream: result.stream }),
+    stream: toUIMessageStream({
+      stream: result.stream,
+      sendSources: true,
+      messageMetadata: ({ part }) =>
+        part.type === "start" ? { fetchedAt: new Date().toISOString() } : undefined,
+    }),
   });
 }

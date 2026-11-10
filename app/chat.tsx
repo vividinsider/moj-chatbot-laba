@@ -4,6 +4,12 @@ import { useChat } from "@ai-sdk/react";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
+function formatFetchedAt(metadata: unknown) {
+  const fetchedAt = (metadata as { fetchedAt?: string } | undefined)?.fetchedAt;
+  if (!fetchedAt) return null;
+  return new Date(fetchedAt).toLocaleString("pl-PL", { timeZone: "Europe/Warsaw" });
+}
+
 export default function Chat() {
   const [input, setInput] = useState("");
   const { messages, sendMessage, status, error } = useChat();
@@ -37,13 +43,33 @@ export default function Chat() {
       </header>
 
       <section className="messages" aria-label="Rozmowa">
-        {messages.map((message) => (
-          <p key={message.id} className={`message ${message.role}`}>
-            {message.parts.map((part, index) =>
-              part.type === "text" ? <span key={index}>{part.text}</span> : null,
-            )}
-          </p>
-        ))}
+        {messages.map((message) => {
+          const sources = message.parts.filter((part) => part.type === "source-url");
+          const fetchedAt = formatFetchedAt(message.metadata);
+
+          return (
+            <div key={message.id} className={`message ${message.role}`}>
+              {message.parts.map((part, index) =>
+                part.type === "text" ? <span key={index}>{part.text}</span> : null,
+              )}
+              {sources.length > 0 && (
+                <div className="sources">
+                  <strong>Źródła:</strong>
+                  <ul>
+                    {sources.map((source) => (
+                      <li key={source.sourceId}>
+                        <a href={source.url} target="_blank" rel="noreferrer">
+                          {source.title || source.url}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                  {fetchedAt && <small>pobrano: {fetchedAt}</small>}
+                </div>
+              )}
+            </div>
+          );
+        })}
         {status === "submitted" && <p className="status">Czekam na odpowiedź…</p>}
         {error && <p className="error">{error.message}</p>}
       </section>

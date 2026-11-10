@@ -177,3 +177,25 @@ a.logout {
 .analysis .draft {
   white-space: pre-wrap;
 }
+
+.sources {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #d8d8dc;
+  font-size: 14px;
+  white-space: normal;
+}
+
+.sources ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.sources a {
+  color: #0b57d0;
+  word-break: break-word;
+}
+
+.sources small {
+  color: #6e6e73;
+}
