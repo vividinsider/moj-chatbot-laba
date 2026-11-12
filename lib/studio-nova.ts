@@ -52,3 +52,9 @@ export const TOOL_RULES = `Narzędzia Studio Nova:
 Do wyceny kilku konsultacji i kwoty po zaliczce używaj narzędzia wycenaKonsultacji.
 Do ceny konsultacji w walucie obcej używaj narzędzia cenaWWalucie i podaj datę kursu NBP.
 Nie licz tych kwot samodzielnie.`;
+
+export const REACT_RULES = `Praca krok po kroku (ReAct):
+Przy zadaniu złożonym pracuj krok po kroku: użyj narzędzia, przeczytaj wynik
+i dopiero wtedy zdecyduj o następnym kroku. Nie zgaduj danych, które możesz sprawdzić.
+Obliczenia wykonuj narzędziem kalkulator. Gdy narzędzie zwróci błąd, powiedz wprost,
+czego nie udało się sprawdzić, i nie powtarzaj tego samego wywołania w kółko.`;

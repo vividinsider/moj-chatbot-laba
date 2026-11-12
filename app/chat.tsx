@@ -1,25 +1,38 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import Link from "next/link";
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
-type Metadata = { fetchedAt?: string; modelId?: string } | undefined;
+type Metadata =
+  | { fetchedAt?: string; modelId?: string; steps?: number; stoppedAtLimit?: boolean; maxSteps?: number }
+  | undefined;
+
 type ToolPart = {
   type: string;
+  toolName?: string;
   state?: string;
   output?: { image?: string; modelId?: string };
   errorText?: string;
 };
 
 const TOOL_LABELS: Record<string, string> = {
-  "tool-generujObraz": "🎨 generujObraz",
-  "tool-wycenaKonsultacji": "🧮 wycenaKonsultacji",
-  "tool-cenaWWalucie": "💱 cenaWWalucie",
+  wyszukiwanie: "🔎 wyszukiwanie",
+  generujObraz: "🎨 obraz",
+  wycenaKonsultacji: "🧮 wycena",
+  cenaWWalucie: "💱 cena w walucie",
+  pogoda: "🌤️ pogoda",
+  waluty: "💶 waluty",
+  swieta: "📅 święta",
+  wikipedia: "📚 wikipedia",
+  kalkulator: "➗ kalkulator",
+  czas: "🕒 czas",
+  notatki: "📝 notatki",
+  diagnostyka: "🩺 diagnostyka",
 };
 
 const transport = new DefaultChatTransport({ api: "/api/agent", body: { mode: "chat" } });
@@ -27,6 +40,39 @@ const transport = new DefaultChatTransport({ api: "/api/agent", body: { mode: "c
 function formatFetchedAt(fetchedAt: string | undefined) {
   if (!fetchedAt) return null;
   return new Date(fetchedAt).toLocaleString("pl-PL", { timeZone: "Europe/Warsaw" });
+}
+
+function toolName(part: ToolPart) {
+  if (part.type === "dynamic-tool") return part.toolName ?? null;
+  return part.type.startsWith("tool-") ? part.type.slice(5) : null;
+}
+
+// Kolejne kroki agenta z nazwami użytych narzędzi, np. [["pogoda"], ["kalkulator"]].
+function toolSteps(message: UIMessage) {
+  const steps: string[][] = [];
+  let current: string[] | null = null;
+
+  for (const part of message.parts as ToolPart[]) {
+    if (part.type === "step-start") {
+      current = [];
+      steps.push(current);
+      continue;
+    }
+    const name = toolName(part);
+    if (!name) continue;
+    if (!current) {
+      current = [];
+      steps.push(current);
+    }
+    current.push(name);
+  }
+
+  const withTools = steps.filter((step) => step.length > 0);
+  const usedSearch = withTools.some((step) => step.includes("wyszukiwanie"));
+  if (!usedSearch && message.parts.some((part) => part.type === "source-url")) {
+    withTools.unshift(["wyszukiwanie"]);
+  }
+  return withTools;
 }
 
 export default function Chat() {
@@ -83,37 +129,43 @@ export default function Chat() {
   return (
     <main className="chat">
       <header className="chat-header">
-        <h1>Mój chatbot</h1>
+        <div className="brand">
+          <h1>Studio Nova</h1>
+          <p>Asystent konsultacji: szkice odpowiedzi, wyceny, pogoda, kursy walut i obrazy.</p>
+        </div>
         <nav className="header-actions">
-          <Link className="logout" href="/analiza">
+          <Link className="button-ghost" href="/dashboard">
+            Podróże
+          </Link>
+          <Link className="button-ghost" href="/analiza">
             Analiza
           </Link>
-          <button type="button" className="logout" onClick={handleLogout}>
+          <button type="button" className="button-ghost" onClick={handleLogout}>
             Wyjdź
           </button>
         </nav>
       </header>
 
       <section className="messages" aria-label="Rozmowa">
+        {messages.length === 0 && (
+          <p className="empty">Napisz pierwszą wiadomość, np. „Jaka będzie jutro pogoda w Lizbonie?”.</p>
+        )}
         {messages.map((message) => {
           const metadata = message.metadata as Metadata;
           const sources = message.parts.filter((part) => part.type === "source-url");
           const fetchedAt = formatFetchedAt(metadata?.fetchedAt);
-          const toolLabels = [
-            ...(sources.length > 0 ? ["🔎 wyszukiwanie"] : []),
-            ...new Set(message.parts.map((part) => TOOL_LABELS[part.type]).filter(Boolean)),
-          ];
+          const steps = message.role === "assistant" ? toolSteps(message) : [];
 
           return (
             <div key={message.id} className={`message ${message.role}`}>
-              {toolLabels.length > 0 && (
-                <div className="tool-labels">
-                  {toolLabels.map((label) => (
-                    <span key={label} className="tool-label">
-                      {label}
-                    </span>
+              {steps.length > 0 && (
+                <ol className="steps" aria-label="Kroki agenta">
+                  {steps.map((step, index) => (
+                    <li key={index} className="tool-label">
+                      {index + 1}. {step.map((name) => TOOL_LABELS[name] ?? name).join(" + ")}
+                    </li>
                   ))}
-                </div>
+                </ol>
               )}
               {message.parts.map((part, index) => {
                 if (part.type === "text") return <span key={index}>{part.text}</span>;
@@ -145,6 +197,11 @@ export default function Chat() {
                 }
                 return null;
               })}
+              {metadata?.stoppedAtLimit && (
+                <p className="limit">
+                  Zatrzymałem się po {metadata.maxSteps} krokach. Powyżej jest to, co udało się ustalić.
+                </p>
+              )}
               {sources.length > 0 && (
                 <div className="sources">
                   <strong>Źródła:</strong>
@@ -161,47 +218,57 @@ export default function Chat() {
                 </div>
               )}
               {message.role === "assistant" && metadata?.modelId && (
-                <small className="model">model: {metadata.modelId}</small>
+                <small className="model">
+                  model: {metadata.modelId}
+                  {metadata.steps ? ` · kroki: ${metadata.steps}` : ""}
+                </small>
               )}
             </div>
           );
         })}
-        {status === "submitted" && <p className="status">Czekam na odpowiedź…</p>}
+        {isBusy && <p className="status typing">Agent pisze…</p>}
         {error && <p className="error">{error.message}</p>}
       </section>
 
-      {fileError && <p className="error">{fileError}</p>}
-      {file && (
-        <p className="status">
-          Dołączone zdjęcie: {file.name}{" "}
-          <button type="button" className="link-button" onClick={clearFile}>
-            usuń
-          </button>
-        </p>
-      )}
+      <div className="composer-area">
+        {fileError && <p className="error">{fileError}</p>}
+        {file && (
+          <p className="status">
+            Dołączone zdjęcie: {file.name}{" "}
+            <button type="button" className="link-button" onClick={clearFile}>
+              usuń
+            </button>
+          </p>
+        )}
 
-      <form className="composer" onSubmit={handleSubmit}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={handleFileChange}
-          hidden
-        />
-        <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
-          Dodaj zdjęcie
-        </button>
-        <input
-          type="text"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="Napisz wiadomość…"
-          aria-label="Wiadomość"
-        />
-        <button type="submit" disabled={isBusy || (!input.trim() && !file)}>
-          Wyślij
-        </button>
-      </form>
+        <form className="composer" onSubmit={handleSubmit}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFileChange}
+            hidden
+          />
+          <button
+            type="button"
+            className="button-ghost"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isBusy}
+          >
+            Dodaj zdjęcie
+          </button>
+          <input
+            type="text"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="Napisz wiadomość…"
+            aria-label="Wiadomość"
+          />
+          <button type="submit" className="button-primary" disabled={isBusy || (!input.trim() && !file)}>
+            Wyślij
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

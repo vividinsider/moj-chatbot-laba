@@ -15,11 +15,22 @@ import { z } from "zod";
 import { hasValidSession } from "@/lib/session";
 import {
   ANALYSIS_RULES,
+  REACT_RULES,
   SEARCH_RULES,
   STUDIO_NOVA_INSTRUCTIONS,
   TOOL_RULES,
 } from "@/lib/studio-nova";
-import { cenaWWalucie, wycenaKonsultacji } from "@/lib/tools";
+import {
+  cenaWWalucie,
+  czas,
+  kalkulator,
+  notatki,
+  pogoda,
+  swieta,
+  waluty,
+  wikipedia,
+  wycenaKonsultacji,
+} from "@/lib/tools";
 import {
   analysisSchema,
   describeAnalysisError,
@@ -29,6 +40,7 @@ import {
 } from "@/lib/analysis";
 
 const IMAGE_MODEL = "google/gemini-3.1-flash-image-preview";
+const MAX_STEPS = 6;
 
 type OpenRouter = ReturnType<typeof createOpenRouter>;
 
@@ -36,8 +48,8 @@ function fail(error: string, status: number) {
   return Response.json({ error }, { status });
 }
 
-function createTools(openrouter: OpenRouter) {
-  return {
+function createTools(openrouter: OpenRouter, model: string) {
+  const tools = {
     wyszukiwanie: openrouter.tools.webSearch({ maxResults: 3, engine: "native" }),
     generujObraz: tool({
       description:
@@ -60,18 +72,49 @@ function createTools(openrouter: OpenRouter) {
     }),
     wycenaKonsultacji,
     cenaWWalucie,
+    pogoda,
+    waluty,
+    swieta,
+    wikipedia,
+    kalkulator,
+    czas,
+    notatki,
+  };
+
+  return {
+    ...tools,
+    diagnostyka: tool({
+      description:
+        "Sprawdza gotowość agenta: nazwa modelu, lista narzędzi, limit kroków i to, czy wymagane " +
+        "zmienne środowiskowe są ustawione. Użyj, gdy użytkownik prosi o diagnostykę.",
+      inputSchema: z.object({}),
+      execute: async () => ({
+        model,
+        narzedzia: [...Object.keys(tools), "diagnostyka"],
+        limitKrokow: MAX_STEPS,
+        // Tylko tak/nie: wartości sekretów nigdy nie trafiają do modelu.
+        zmienneSrodowiskowe: {
+          OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ? "tak" : "nie",
+          OPENROUTER_MODEL: process.env.OPENROUTER_MODEL ? "tak" : "nie",
+          CHAT_PASSWORD: process.env.CHAT_PASSWORD ? "tak" : "nie",
+          SESSION_SECRET: process.env.SESSION_SECRET ? "tak" : "nie",
+        },
+        pobrano: new Date().toISOString(),
+      }),
+    }),
   };
 }
 
 async function chat(openrouter: OpenRouter, model: string, messages: UIMessage[]) {
-  const tools = createTools(openrouter);
+  const tools = createTools(openrouter, model);
+  let steps = 0;
 
   const result = streamText({
     model: openrouter.chat(model),
-    instructions: `${STUDIO_NOVA_INSTRUCTIONS}\n\n${SEARCH_RULES}\n\n${TOOL_RULES}`,
+    instructions: `${STUDIO_NOVA_INSTRUCTIONS}\n\n${SEARCH_RULES}\n\n${TOOL_RULES}\n\n${REACT_RULES}`,
     messages: await convertToModelMessages(messages, { tools }),
     tools,
-    stopWhen: isStepCount(5),
+    stopWhen: isStepCount(MAX_STEPS),
   });
 
   return createUIMessageStreamResponse({
@@ -80,7 +123,14 @@ async function chat(openrouter: OpenRouter, model: string, messages: UIMessage[]
       sendSources: true,
       messageMetadata: ({ part }) => {
         if (part.type === "start") return { fetchedAt: new Date().toISOString() };
-        if (part.type === "finish-step") return { modelId: part.response.modelId };
+        if (part.type === "finish-step") {
+          steps += 1;
+          return { modelId: part.response.modelId, steps };
+        }
+        if (part.type === "finish") {
+          // Ostatni krok zakończony wywołaniem narzędzia = agent doszedł do limitu kroków.
+          return { stoppedAtLimit: part.finishReason === "tool-calls", maxSteps: MAX_STEPS };
+        }
         return undefined;
       },
     }),
