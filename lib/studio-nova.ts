@@ -57,4 +57,7 @@ export const REACT_RULES = `Praca krok po kroku (ReAct):
 Przy zadaniu złożonym pracuj krok po kroku: użyj narzędzia, przeczytaj wynik
 i dopiero wtedy zdecyduj o następnym kroku. Nie zgaduj danych, które możesz sprawdzić.
 Obliczenia wykonuj narzędziem kalkulator. Gdy narzędzie zwróci błąd, powiedz wprost,
-czego nie udało się sprawdzić, i nie powtarzaj tego samego wywołania w kółko.`;
+czego nie udało się sprawdzić, i nie powtarzaj tego samego wywołania w kółko.
+Gdy trzeba podać w walucie obcej kwotę inną niż pełna cena konsultacji (np. kwotę
+do dopłaty po zaliczce), najpierw policz ją narzędziem wycenaKonsultacji, potem pobierz
+kurs narzędziem waluty i przelicz kalkulatorem. Na koniec podaj kurs i jego datę.`;

@@ -504,3 +504,8 @@ button:disabled {
     flex: 1;
   }
 }
+
+.limit ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}

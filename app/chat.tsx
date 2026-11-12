@@ -37,6 +37,46 @@ const TOOL_LABELS: Record<string, string> = {
 
 const transport = new DefaultChatTransport({ api: "/api/agent", body: { mode: "chat" } });
 
+type Output = Record<string, unknown>;
+
+// Krótki opis wyniku narzędzia, pokazywany, gdy agent zatrzyma się na limicie kroków.
+function summarizeOutput(name: string, output: Output) {
+  if (output.ok === false || typeof output.blad === "string") return `błąd: ${String(output.blad)}`;
+  switch (name) {
+    case "pogoda":
+      return `${output.miasto}: ${output.pogoda}, ${output.temperaturaMinC}–${output.temperaturaMaxC} °C`;
+    case "waluty":
+      return `1 ${output.waluta} = ${output.kursPLN} zł (NBP, ${output.dataKursu})`;
+    case "kalkulator":
+      return `wynik: ${output.wynik}`;
+    case "wycenaKonsultacji":
+      return `razem ${output.razemPLN} zł, do zapłaty ${output.doZaplatyPLN} zł`;
+    case "cenaWWalucie":
+      return `${output.kwotaPLN} zł = ${output.kwotaWWalucie} ${output.waluta}`;
+    case "czas":
+      return `${output.strefa}: ${output.czasNaMiejscu}`;
+    case "wikipedia":
+      return `${output.tytul}`;
+    case "swieta":
+      return `${Array.isArray(output.swieta) ? output.swieta.length : 0} dni wolnych`;
+    case "notatki":
+      return output.zapisano ? `zapisano: ${output.zapisano}` : `${output.liczbaNotatek} notatek`;
+    default:
+      return null;
+  }
+}
+
+function collectedResults(message: UIMessage) {
+  return (message.parts as ToolPart[])
+    .map((part) => {
+      const name = toolName(part);
+      if (!name || part.state !== "output-available" || !part.output) return null;
+      const summary = summarizeOutput(name, part.output as Output);
+      return summary ? `${TOOL_LABELS[name] ?? name}: ${summary}` : null;
+    })
+    .filter((line): line is string => line !== null);
+}
+
 function formatFetchedAt(fetchedAt: string | undefined) {
   if (!fetchedAt) return null;
   return new Date(fetchedAt).toLocaleString("pl-PL", { timeZone: "Europe/Warsaw" });
@@ -198,9 +238,14 @@ export default function Chat() {
                 return null;
               })}
               {metadata?.stoppedAtLimit && (
-                <p className="limit">
-                  Zatrzymałem się po {metadata.maxSteps} krokach. Powyżej jest to, co udało się ustalić.
-                </p>
+                <div className="limit">
+                  <strong>Zatrzymałem się po {metadata.maxSteps} krokach.</strong> Oto, co udało się ustalić:
+                  <ul>
+                    {collectedResults(message).map((line, index) => (
+                      <li key={index}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
               {sources.length > 0 && (
                 <div className="sources">
