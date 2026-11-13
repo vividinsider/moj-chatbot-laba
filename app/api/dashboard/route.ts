@@ -57,7 +57,8 @@ async function summarize(cards: Record<string, unknown>) {
         "co spakować i na co uważać. Korzystaj tylko z podanych danych. Jeśli któraś karta " +
         "ma błąd, powiedz wprost, którego źródła zabrakło.",
       prompt: JSON.stringify(cards),
-      maxOutputTokens: 300,
+      // Model może zużyć część limitu na rozumowanie, więc zostawiamy zapas.
+      maxOutputTokens: 2000,
     });
     return result.text;
   } catch (error) {
