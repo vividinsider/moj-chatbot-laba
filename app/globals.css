@@ -509,3 +509,35 @@ button:disabled {
   margin: 6px 0 0;
   padding-left: 18px;
 }
+
+/* Historia rozmów */
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 18px;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.history a:hover {
+  border-color: var(--accent);
+}
+
+.history small {
+  color: var(--text-muted);
+}

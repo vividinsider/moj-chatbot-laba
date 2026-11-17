@@ -3,13 +3,20 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import Link from "next/link";
-import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
 type Metadata =
-  | { fetchedAt?: string; modelId?: string; steps?: number; stoppedAtLimit?: boolean; maxSteps?: number }
+  | {
+      fetchedAt?: string;
+      modelId?: string;
+      steps?: number;
+      stoppedAtLimit?: boolean;
+      maxSteps?: number;
+      conversationId?: number;
+    }
   | undefined;
 
 type ToolPart = {
@@ -33,9 +40,9 @@ const TOOL_LABELS: Record<string, string> = {
   czas: "🕒 czas",
   notatki: "📝 notatki",
   diagnostyka: "🩺 diagnostyka",
+  zapiszProfil: "🧠 pamięć",
 };
 
-const transport = new DefaultChatTransport({ api: "/api/agent", body: { mode: "chat" } });
 
 type Output = Record<string, unknown>;
 
@@ -115,12 +122,40 @@ function toolSteps(message: UIMessage) {
   return withTools;
 }
 
-export default function Chat() {
+type ChatProps = {
+  initialConversationId: number | null;
+  initialMessages: UIMessage[];
+};
+
+export default function Chat({ initialConversationId, initialMessages }: ChatProps) {
   const [input, setInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { messages, sendMessage, status, error } = useChat({ transport });
+  // Numer rozmowy w bazie: serwer nadaje go przy pierwszej wiadomości.
+  const conversationIdRef = useRef<number | null>(initialConversationId);
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/agent",
+        body: () => ({ mode: "chat", conversationId: conversationIdRef.current }),
+      }),
+    [],
+  );
+
+  const { messages, sendMessage, status, error } = useChat({
+    transport,
+    messages: initialMessages,
+    onFinish: ({ message }) => {
+      const id = (message.metadata as Metadata)?.conversationId;
+      if (id && id !== conversationIdRef.current) {
+        conversationIdRef.current = id;
+        // Adres wskazuje tę rozmowę, więc F5 wczyta właśnie ją.
+        window.history.replaceState(null, "", `/?c=${id}`);
+      }
+    },
+  });
   const isBusy = status === "submitted" || status === "streaming";
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -174,6 +209,12 @@ export default function Chat() {
           <p>Asystent konsultacji: szkice odpowiedzi, wyceny, pogoda, kursy walut i obrazy.</p>
         </div>
         <nav className="header-actions">
+          <Link className="button-ghost" href="/?nowa=1">
+            Nowa rozmowa
+          </Link>
+          <Link className="button-ghost" href="/history">
+            Historia
+          </Link>
           <Link className="button-ghost" href="/dashboard">
             Podróże
           </Link>

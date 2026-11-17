@@ -15,6 +15,7 @@ import { z } from "zod";
 import { hasValidSession } from "@/lib/session";
 import {
   ANALYSIS_RULES,
+  MEMORY_RULES,
   REACT_RULES,
   SEARCH_RULES,
   STUDIO_NOVA_INSTRUCTIONS,
@@ -31,6 +32,15 @@ import {
   wikipedia,
   wycenaKonsultacji,
 } from "@/lib/tools";
+import {
+  conversationExists,
+  createConversation,
+  getProfile,
+  messageText,
+  profileForInstructions,
+  saveExchange,
+  updateProfile,
+} from "@/lib/memory";
 import {
   analysisSchema,
   describeAnalysisError,
@@ -105,13 +115,64 @@ function createTools(openrouter: OpenRouter, model: string) {
   };
 }
 
-async function chat(openrouter: OpenRouter, model: string, messages: UIMessage[]) {
-  const tools = createTools(openrouter, model);
+const zapiszProfil = tool({
+  description:
+    "Zapisuje w pamięci informacje, które użytkownik podał WPROST o sobie: imię oraz fakty " +
+    "(np. miasto, ulubione jedzenie, preferowany styl odpowiedzi). Nie zapisuj domysłów, planów, " +
+    "żartów ani danych wrażliwych (hasła, klucze, numery kart, dane zdrowotne).",
+  inputSchema: z.object({
+    imie: z.string().min(1).max(60).optional().describe("Imię użytkownika, jeśli je podał"),
+    fakty: z
+      .array(
+        z.object({
+          nazwa: z.string().min(1).max(40).describe("Nazwa faktu, np. miasto, ulubione jedzenie"),
+          wartosc: z.string().min(1).max(200).describe("Wartość faktu, np. Toruń"),
+        }),
+      )
+      .max(10)
+      .default([])
+      .describe("Pozostałe fakty o użytkowniku"),
+  }),
+  execute: async ({ imie, fakty }) => {
+    try {
+      const preferences = Object.fromEntries(fakty.map((fakt) => [fakt.nazwa.toLowerCase(), fakt.wartosc]));
+      const profile = await updateProfile({ name: imie, preferences });
+      return { zapisano: { imie, fakty }, profil: profile };
+    } catch (error) {
+      console.error("Błąd zapisu profilu:", error);
+      return { blad: "Nie udało się zapisać profilu w bazie." };
+    }
+  },
+});
+
+async function resolveConversation(conversationId: unknown, messages: UIMessage[]) {
+  if (typeof conversationId === "number" && (await conversationExists(conversationId))) {
+    return conversationId;
+  }
+  const firstUser = messages.find((message) => message.role === "user");
+  return createConversation(firstUser ? messageText(firstUser) : "Nowa rozmowa");
+}
+
+async function chat(openrouter: OpenRouter, model: string, messages: UIMessage[], conversationIdInput: unknown) {
+  const tools = { ...createTools(openrouter, model), zapiszProfil };
   let steps = 0;
+
+  const [conversationId, profile] = await Promise.all([
+    resolveConversation(conversationIdInput, messages),
+    getProfile(),
+  ]);
+  const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
 
   const result = streamText({
     model: openrouter.chat(model),
-    instructions: `${STUDIO_NOVA_INSTRUCTIONS}\n\n${SEARCH_RULES}\n\n${TOOL_RULES}\n\n${REACT_RULES}`,
+    instructions: [
+      STUDIO_NOVA_INSTRUCTIONS,
+      SEARCH_RULES,
+      TOOL_RULES,
+      REACT_RULES,
+      MEMORY_RULES,
+      profileForInstructions(profile),
+    ].join("\n\n"),
     messages: await convertToModelMessages(messages, { tools }),
     tools,
     stopWhen: isStepCount(MAX_STEPS),
@@ -121,8 +182,18 @@ async function chat(openrouter: OpenRouter, model: string, messages: UIMessage[]
     stream: toUIMessageStream({
       stream: result.stream,
       sendSources: true,
+      originalMessages: messages,
+      // Zapis po zakończeniu odpowiedzi: pytanie i gotowa odpowiedź, raz i w dobrej kolejności.
+      onEnd: async ({ responseMessage, isAborted }) => {
+        if (isAborted || !lastUserMessage) return;
+        try {
+          await saveExchange(conversationId, messageText(lastUserMessage), messageText(responseMessage));
+        } catch (error) {
+          console.error("Błąd zapisu rozmowy:", error);
+        }
+      },
       messageMetadata: ({ part }) => {
-        if (part.type === "start") return { fetchedAt: new Date().toISOString() };
+        if (part.type === "start") return { fetchedAt: new Date().toISOString(), conversationId };
         if (part.type === "finish-step") {
           steps += 1;
           return { modelId: part.response.modelId, steps };
@@ -187,7 +258,7 @@ export async function POST(req: Request) {
     return analyze(openrouter, model, body);
   }
   if (body?.mode === "chat" && Array.isArray(body.messages)) {
-    return chat(openrouter, model, body.messages);
+    return chat(openrouter, model, body.messages, body.conversationId);
   }
   return fail("Nieprawidłowe żądanie: podaj mode „chat” albo „analyze”.", 400);
 }
