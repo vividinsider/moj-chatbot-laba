@@ -41,6 +41,7 @@ const TOOL_LABELS: Record<string, string> = {
   notatki: "📝 notatki",
   diagnostyka: "🩺 diagnostyka",
   zapiszProfil: "🧠 pamięć",
+  searchKnowledge: "📚 baza wiedzy",
 };
 
 
@@ -120,6 +121,22 @@ function toolSteps(message: UIMessage) {
     withTools.unshift(["wyszukiwanie"]);
   }
   return withTools;
+}
+
+type KnowledgeMatch = { title: string; content: string; similarity: number };
+
+// Fragmenty z bazy wiedzy, na których agent oparł odpowiedź.
+function knowledgeMatches(message: UIMessage) {
+  const matches: KnowledgeMatch[] = [];
+  for (const part of message.parts as ToolPart[]) {
+    const output = part.output as { fragmenty?: KnowledgeMatch[] } | undefined;
+    if (part.type === "tool-searchKnowledge" && part.state === "output-available" && output?.fragmenty) {
+      for (const match of output.fragmenty) {
+        if (!matches.some((known) => known.content === match.content)) matches.push(match);
+      }
+    }
+  }
+  return matches;
 }
 
 type ChatProps = {
@@ -212,6 +229,9 @@ export default function Chat({ initialConversationId, initialMessages }: ChatPro
           <Link className="button-ghost" href="/?nowa=1">
             Nowa rozmowa
           </Link>
+          <Link className="button-ghost" href="/upload">
+            Baza wiedzy
+          </Link>
           <Link className="button-ghost" href="/history">
             Historia
           </Link>
@@ -236,6 +256,7 @@ export default function Chat({ initialConversationId, initialMessages }: ChatPro
           const sources = message.parts.filter((part) => part.type === "source-url");
           const fetchedAt = formatFetchedAt(metadata?.fetchedAt);
           const steps = message.role === "assistant" ? toolSteps(message) : [];
+          const knowledge = message.role === "assistant" ? knowledgeMatches(message) : [];
 
           return (
             <div key={message.id} className={`message ${message.role}`}>
@@ -286,6 +307,19 @@ export default function Chat({ initialConversationId, initialMessages }: ChatPro
                       <li key={index}>{line}</li>
                     ))}
                   </ul>
+                </div>
+              )}
+              {knowledge.length > 0 && (
+                <div className="knowledge-sources">
+                  <strong>Fragmenty z bazy wiedzy:</strong>
+                  {knowledge.map((match, index) => (
+                    <details key={index}>
+                      <summary>
+                        {match.title} · podobieństwo {Math.round(match.similarity * 100)}% · Pokaż fragment
+                      </summary>
+                      <blockquote>{match.content}</blockquote>
+                    </details>
+                  ))}
                 </div>
               )}
               {sources.length > 0 && (

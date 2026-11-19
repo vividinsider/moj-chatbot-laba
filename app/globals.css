@@ -541,3 +541,59 @@ button:disabled {
 .history small {
   color: var(--text-muted);
 }
+
+/* Baza wiedzy */
+
+.text-input {
+  min-height: 42px;
+  padding: 10px 16px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.document-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-muted);
+  border-radius: 12px;
+}
+
+.document-row span {
+  display: flex;
+  flex-direction: column;
+}
+
+.document-row small {
+  color: var(--text-muted);
+}
+
+.knowledge-sources {
+  margin-top: 10px;
+  padding-top: 8px;
+  font-size: 14px;
+  white-space: normal;
+  border-top: 1px solid var(--border);
+}
+
+.knowledge-sources details {
+  margin-top: 4px;
+}
+
+.knowledge-sources summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.knowledge-sources blockquote {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+}

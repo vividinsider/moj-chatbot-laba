@@ -15,6 +15,7 @@ import { z } from "zod";
 import { hasValidSession } from "@/lib/session";
 import {
   ANALYSIS_RULES,
+  KNOWLEDGE_RULES,
   MEMORY_RULES,
   REACT_RULES,
   SEARCH_RULES,
@@ -41,6 +42,7 @@ import {
   saveExchange,
   updateProfile,
 } from "@/lib/memory";
+import { searchKnowledgeBase } from "@/lib/knowledge";
 import {
   analysisSchema,
   describeAnalysisError,
@@ -115,6 +117,26 @@ function createTools(openrouter: OpenRouter, model: string) {
   };
 }
 
+const searchKnowledge = tool({
+  description:
+    "Wyszukuje w bazie wiedzy (dokumenty firm wgrane na stronie /upload) fragmenty najbliższe " +
+    "znaczeniem pytaniu. Używaj przy każdym pytaniu o firmę, ofertę, pakiety, ceny, zasady i regulamin.",
+  inputSchema: z.object({
+    pytanie: z.string().min(1).max(500).describe("Pytanie użytkownika, którego dotyczy wyszukiwanie"),
+  }),
+  execute: async ({ pytanie }) => {
+    try {
+      const fragmenty = await searchKnowledgeBase(pytanie);
+      return fragmenty.length
+        ? { fragmenty }
+        : { fragmenty, informacja: "Brak pasujących fragmentów w bazie wiedzy." };
+    } catch (error) {
+      console.error("Błąd wyszukiwania w bazie wiedzy:", error);
+      return { blad: "Nie udało się przeszukać bazy wiedzy." };
+    }
+  },
+});
+
 const zapiszProfil = tool({
   description:
     "Zapisuje w pamięci informacje, które użytkownik podał WPROST o sobie: imię oraz fakty " +
@@ -154,7 +176,7 @@ async function resolveConversation(conversationId: unknown, messages: UIMessage[
 }
 
 async function chat(openrouter: OpenRouter, model: string, messages: UIMessage[], conversationIdInput: unknown) {
-  const tools = { ...createTools(openrouter, model), zapiszProfil };
+  const tools = { ...createTools(openrouter, model), zapiszProfil, searchKnowledge };
   let steps = 0;
 
   const [conversationId, profile] = await Promise.all([
@@ -170,6 +192,7 @@ async function chat(openrouter: OpenRouter, model: string, messages: UIMessage[]
       SEARCH_RULES,
       TOOL_RULES,
       REACT_RULES,
+      KNOWLEDGE_RULES,
       MEMORY_RULES,
       profileForInstructions(profile),
     ].join("\n\n"),
