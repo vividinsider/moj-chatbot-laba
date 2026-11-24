@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
 import Analyze from "../analyze";
-import LoginForm from "../login-form";
-import { hasValidSession } from "@/lib/session";
+import { getCurrentUser } from "@/lib/auth";
 
 export default async function AnalysisPage() {
-  return (await hasValidSession()) ? <Analyze /> : <LoginForm />;
+  const { user } = await getCurrentUser();
+  if (!user) redirect("/login?next=/analiza");
+  return <Analyze />;
 }

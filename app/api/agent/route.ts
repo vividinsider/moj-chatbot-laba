@@ -12,7 +12,8 @@ import {
 } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
-import { hasValidSession } from "@/lib/session";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCurrentUser, viewerFromUser } from "@/lib/auth";
 import {
   ANALYSIS_RULES,
   KNOWLEDGE_RULES,
@@ -137,7 +138,9 @@ const searchKnowledge = tool({
   },
 });
 
-const zapiszProfil = tool({
+// Profil zapisuje się zawsze dla zalogowanej osoby (klient z jej sesją).
+function createZapiszProfil(db: SupabaseClient) {
+  return tool({
   description:
     "Zapisuje w pamięci informacje, które użytkownik podał WPROST o sobie: imię oraz fakty " +
     "(np. miasto, ulubione jedzenie, preferowany styl odpowiedzi). Nie zapisuj domysłów, planów, " +
@@ -158,31 +161,44 @@ const zapiszProfil = tool({
   execute: async ({ imie, fakty }) => {
     try {
       const preferences = Object.fromEntries(fakty.map((fakt) => [fakt.nazwa.toLowerCase(), fakt.wartosc]));
-      const profile = await updateProfile({ name: imie, preferences });
+      const profile = await updateProfile(db, { name: imie, preferences });
       return { zapisano: { imie, fakty }, profil: profile };
     } catch (error) {
       console.error("Błąd zapisu profilu:", error);
       return { blad: "Nie udało się zapisać profilu w bazie." };
     }
   },
-});
+  });
+}
 
-async function resolveConversation(conversationId: unknown, messages: UIMessage[]) {
-  if (typeof conversationId === "number" && (await conversationExists(conversationId))) {
+async function resolveConversation(db: SupabaseClient, conversationId: unknown, messages: UIMessage[]) {
+  if (typeof conversationId === "number" && (await conversationExists(db, conversationId))) {
     return conversationId;
   }
   const firstUser = messages.find((message) => message.role === "user");
-  return createConversation(firstUser ? messageText(firstUser) : "Nowa rozmowa");
+  return createConversation(db, firstUser ? messageText(firstUser) : "Nowa rozmowa");
 }
 
-async function chat(openrouter: OpenRouter, model: string, messages: UIMessage[], conversationIdInput: unknown) {
-  const tools = { ...createTools(openrouter, model), zapiszProfil, searchKnowledge };
+async function chat(
+  openrouter: OpenRouter,
+  model: string,
+  messages: UIMessage[],
+  conversationIdInput: unknown,
+  db: SupabaseClient,
+  googleName: string | null,
+) {
+  const tools = { ...createTools(openrouter, model), zapiszProfil: createZapiszProfil(db), searchKnowledge };
   let steps = 0;
 
   const [conversationId, profile] = await Promise.all([
-    resolveConversation(conversationIdInput, messages),
-    getProfile(),
+    resolveConversation(db, conversationIdInput, messages),
+    getProfile(db),
   ]);
+  // Pierwsze wejście przez Google: imię z konta Google trafia do profilu.
+  if (!profile.name && googleName) {
+    profile.name = googleName;
+    await updateProfile(db, { name: googleName }).catch((error) => console.error("Błąd zapisu imienia:", error));
+  }
   const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
 
   const result = streamText({
@@ -210,7 +226,7 @@ async function chat(openrouter: OpenRouter, model: string, messages: UIMessage[]
       onEnd: async ({ responseMessage, isAborted }) => {
         if (isAborted || !lastUserMessage) return;
         try {
-          await saveExchange(conversationId, messageText(lastUserMessage), messageText(responseMessage));
+          await saveExchange(db, conversationId, messageText(lastUserMessage), messageText(responseMessage));
         } catch (error) {
           console.error("Błąd zapisu rozmowy:", error);
         }
@@ -263,7 +279,8 @@ async function analyze(openrouter: OpenRouter, model: string, body: Record<strin
 }
 
 export async function POST(req: Request) {
-  if (!(await hasValidSession())) {
+  const { supabase, user } = await getCurrentUser();
+  if (!user) {
     return fail("Sesja wygasła. Zaloguj się ponownie.", 401);
   }
 
@@ -281,7 +298,9 @@ export async function POST(req: Request) {
     return analyze(openrouter, model, body);
   }
   if (body?.mode === "chat" && Array.isArray(body.messages)) {
-    return chat(openrouter, model, body.messages, body.conversationId);
+    const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+    const googleName = typeof meta.full_name === "string" ? viewerFromUser(user).name : null;
+    return chat(openrouter, model, body.messages, body.conversationId, supabase, googleName);
   }
   return fail("Nieprawidłowe żądanie: podaj mode „chat” albo „analyze”.", 400);
 }

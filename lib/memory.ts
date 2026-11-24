@@ -1,7 +1,8 @@
 // Pamięć agenta w Supabase: rozmowy, wiadomości i profil użytkownika.
-// Do lekcji 7 aplikacja ma jednego właściciela, więc profil to jeden wiersz.
+// Wszystkie funkcje dostają klienta zalogowanej osoby, więc baza (RLS) zwraca
+// i zapisuje tylko jej wiersze. Kolumnę user_id wypełnia baza (auth.uid()).
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UIMessage } from "ai";
-import { getSupabase } from "@/lib/supabase";
 
 export type ConversationSummary = {
   id: number;
@@ -22,6 +23,11 @@ function check<T>(result: { data: T | null; error: { message: string } | null })
   return result.data;
 }
 
+// Zapis bez zwracania wierszy: liczy się tylko brak błędu.
+function checkWrite(result: { error: { message: string } | null }) {
+  if (result.error) throw new Error(`Błąd zapisu: ${result.error.message}`);
+}
+
 // Tekst wiadomości do zapisu. Obrazów nie trzymamy w bazie.
 export function messageText(message: UIMessage) {
   const pieces: string[] = [];
@@ -33,8 +39,8 @@ export function messageText(message: UIMessage) {
   return pieces.join("\n").trim();
 }
 
-export async function createConversation(title: string) {
-  const result = await getSupabase()
+export async function createConversation(db: SupabaseClient, title: string) {
+  const result = await db
     .from("conversations")
     .insert({ title: title.slice(0, 80) || "Nowa rozmowa" })
     .select("id")
@@ -45,21 +51,19 @@ export async function createConversation(title: string) {
   return result.data.id as number;
 }
 
-export async function conversationExists(id: number) {
-  const rows = check(await getSupabase().from("conversations").select("id").eq("id", id).limit(1));
+export async function conversationExists(db: SupabaseClient, id: number) {
+  const rows = check(await db.from("conversations").select("id").eq("id", id).limit(1));
   return rows.length > 0;
 }
 
-export async function getLatestConversationId() {
-  const rows = check(
-    await getSupabase().from("conversations").select("id").order("id", { ascending: false }).limit(1),
-  );
+export async function getLatestConversationId(db: SupabaseClient) {
+  const rows = check(await db.from("conversations").select("id").order("id", { ascending: false }).limit(1));
   return rows.length ? (rows[0].id as number) : null;
 }
 
-export async function loadMessages(conversationId: number): Promise<UIMessage[]> {
+export async function loadMessages(db: SupabaseClient, conversationId: number): Promise<UIMessage[]> {
   const rows = check(
-    await getSupabase()
+    await db
       .from("messages")
       .select("id, role, content")
       .eq("conversation_id", conversationId)
@@ -73,17 +77,22 @@ export async function loadMessages(conversationId: number): Promise<UIMessage[]>
 }
 
 // Zapis pytania i odpowiedzi jednym wywołaniem: raz, w dobrej kolejności.
-export async function saveExchange(conversationId: number, userText: string, assistantText: string) {
+export async function saveExchange(
+  db: SupabaseClient,
+  conversationId: number,
+  userText: string,
+  assistantText: string,
+) {
   const rows = [
     { conversation_id: conversationId, role: "user", content: userText },
     { conversation_id: conversationId, role: "assistant", content: assistantText },
   ].filter((row) => row.content);
-  if (rows.length) check(await getSupabase().from("messages").insert(rows));
+  if (rows.length) checkWrite(await db.from("messages").insert(rows));
 }
 
-export async function listConversations(): Promise<ConversationSummary[]> {
+export async function listConversations(db: SupabaseClient): Promise<ConversationSummary[]> {
   const rows = check(
-    await getSupabase()
+    await db
       .from("conversations")
       .select("id, title, created_at, messages(count)")
       .order("id", { ascending: false }),
@@ -96,10 +105,8 @@ export async function listConversations(): Promise<ConversationSummary[]> {
   }));
 }
 
-export async function getProfile(): Promise<Profile & { id: number | null }> {
-  const rows = check(
-    await getSupabase().from("user_profiles").select("id, name, preferences").order("id").limit(1),
-  );
+export async function getProfile(db: SupabaseClient): Promise<Profile & { id: number | null }> {
+  const rows = check(await db.from("user_profiles").select("id, name, preferences").order("id").limit(1));
   const row = rows[0];
   return {
     id: row ? (row.id as number) : null,
@@ -112,24 +119,29 @@ export async function getProfile(): Promise<Profile & { id: number | null }> {
 // Kolejka wykonuje zapisy po kolei, żeby nie powstały dwa wiersze ani nie zginął żaden fakt.
 let profileQueue: Promise<unknown> = Promise.resolve();
 
-// Aktualizuje jedyny wiersz profilu. Nowe fakty dopisują się do starych.
-export function updateProfile(update: { name?: string; preferences?: Record<string, string> }) {
-  const run = profileQueue.then(() => writeProfile(update));
+// Aktualizuje profil zalogowanej osoby (jeden wiersz). Nowe fakty dopisują się do starych.
+export function updateProfile(
+  db: SupabaseClient,
+  update: { name?: string; preferences?: Record<string, string> },
+) {
+  const run = profileQueue.then(() => writeProfile(db, update));
   profileQueue = run.catch(() => undefined);
   return run;
 }
 
-async function writeProfile(update: { name?: string; preferences?: Record<string, string> }) {
-  const current = await getProfile();
+async function writeProfile(
+  db: SupabaseClient,
+  update: { name?: string; preferences?: Record<string, string> },
+) {
+  const current = await getProfile(db);
   const next = {
     name: update.name ?? current.name,
     preferences: { ...current.preferences, ...(update.preferences ?? {}) },
   };
-  const supabase = getSupabase();
   if (current.id === null) {
-    check(await supabase.from("user_profiles").insert(next));
+    checkWrite(await db.from("user_profiles").insert(next));
   } else {
-    check(await supabase.from("user_profiles").update(next).eq("id", current.id));
+    checkWrite(await db.from("user_profiles").update(next).eq("id", current.id));
   }
   return next;
 }

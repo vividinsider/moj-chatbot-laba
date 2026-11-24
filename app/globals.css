@@ -597,3 +597,63 @@ button:disabled {
   border-left: 3px solid var(--accent);
   border-radius: 6px;
 }
+
+/* Logowanie i zalogowana osoba */
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: var(--surface-muted);
+  border-radius: 999px;
+}
+
+.tab {
+  flex: 1;
+  min-height: 38px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.tab.active {
+  color: var(--accent);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.google {
+  width: 100%;
+}
+
+.viewer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.viewer small {
+  color: var(--text-muted);
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--accent-text);
+  background: var(--accent);
+}

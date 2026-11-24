@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
-import { hasValidSession } from "@/lib/session";
+import { getCurrentUser } from "@/lib/auth";
 import {
   findPlace,
   getCountryCurrency,
@@ -68,7 +68,7 @@ async function summarize(cards: Record<string, unknown>) {
 }
 
 export async function POST(req: Request) {
-  if (!(await hasValidSession())) {
+  if (!(await getCurrentUser()).user) {
     return fail("Sesja wygasła. Zaloguj się ponownie.", 401);
   }
 

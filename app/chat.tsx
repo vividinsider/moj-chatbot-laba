@@ -140,11 +140,12 @@ function knowledgeMatches(message: UIMessage) {
 }
 
 type ChatProps = {
+  viewer: { email: string; name: string; avatarUrl: string | null };
   initialConversationId: number | null;
   initialMessages: UIMessage[];
 };
 
-export default function Chat({ initialConversationId, initialMessages }: ChatProps) {
+export default function Chat({ viewer, initialConversationId, initialMessages }: ChatProps) {
   const [input, setInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
@@ -214,8 +215,9 @@ export default function Chat({ initialConversationId, initialMessages }: ChatPro
   }
 
   async function handleLogout() {
-    await fetch("/api/logout", { method: "POST" });
-    window.location.reload();
+    await fetch("/auth/signout", { method: "POST" });
+    // replace: przycisk „Wstecz” nie wróci do danych poprzedniej osoby.
+    window.location.replace("/login");
   }
 
   return (
@@ -224,6 +226,16 @@ export default function Chat({ initialConversationId, initialMessages }: ChatPro
         <div className="brand">
           <h1>Studio Nova</h1>
           <p>Asystent konsultacji: szkice odpowiedzi, wyceny, pogoda, kursy walut i obrazy.</p>
+          <div className="viewer">
+            {viewer.avatarUrl ? (
+              <img className="avatar" src={viewer.avatarUrl} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="avatar avatar-letter">{viewer.name.charAt(0).toUpperCase()}</span>
+            )}
+            <span>
+              <strong>{viewer.name}</strong> <small>{viewer.email}</small>
+            </span>
+          </div>
         </div>
         <nav className="header-actions">
           <Link className="button-ghost" href="/?nowa=1">
@@ -242,7 +254,7 @@ export default function Chat({ initialConversationId, initialMessages }: ChatPro
             Analiza
           </Link>
           <button type="button" className="button-ghost" onClick={handleLogout}>
-            Wyjdź
+            Wyloguj
           </button>
         </nav>
       </header>

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { hasValidSession } from "@/lib/session";
+import { getCurrentUser } from "@/lib/auth";
 import {
   deleteDocument,
   findDocumentByTitle,
@@ -23,7 +23,7 @@ function fail(error: string, status: number) {
 }
 
 export async function GET() {
-  if (!(await hasValidSession())) return fail("Sesja wygasła. Zaloguj się ponownie.", 401);
+  if (!(await getCurrentUser()).user) return fail("Sesja wygasła. Zaloguj się ponownie.", 401);
   try {
     return Response.json({ documents: await listDocuments() });
   } catch (error) {
@@ -33,7 +33,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  if (!(await hasValidSession())) return fail("Sesja wygasła. Zaloguj się ponownie.", 401);
+  if (!(await getCurrentUser()).user) return fail("Sesja wygasła. Zaloguj się ponownie.", 401);
 
   const parsed = importSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Nieprawidłowe dane.", 400);
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  if (!(await hasValidSession())) return fail("Sesja wygasła. Zaloguj się ponownie.", 401);
+  if (!(await getCurrentUser()).user) return fail("Sesja wygasła. Zaloguj się ponownie.", 401);
   const id = Number(new URL(req.url).searchParams.get("id"));
   if (!Number.isInteger(id) || id <= 0) return fail("Nieprawidłowy dokument.", 400);
   try {

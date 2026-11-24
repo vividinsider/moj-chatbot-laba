@@ -1,6 +1,6 @@
 import Link from "next/link";
-import LoginForm from "../login-form";
-import { hasValidSession } from "@/lib/session";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { listConversations, type ConversationSummary } from "@/lib/memory";
 
 function formatDate(iso: string) {
@@ -8,12 +8,13 @@ function formatDate(iso: string) {
 }
 
 export default async function HistoryPage() {
-  if (!(await hasValidSession())) return <LoginForm />;
+  const { supabase, user } = await getCurrentUser();
+  if (!user) redirect("/login?next=/history");
 
   let conversations: ConversationSummary[] = [];
   let error = "";
   try {
-    conversations = await listConversations();
+    conversations = await listConversations(supabase);
   } catch (cause) {
     console.error("Nie udało się wczytać historii:", cause);
     error = "Nie udało się wczytać historii rozmów. Sprawdź połączenie z bazą.";

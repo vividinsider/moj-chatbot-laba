@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
 import Dashboard from "../travel-dashboard";
-import LoginForm from "../login-form";
-import { hasValidSession } from "@/lib/session";
+import { getCurrentUser } from "@/lib/auth";
 
 export default async function DashboardPage() {
-  return (await hasValidSession()) ? <Dashboard /> : <LoginForm />;
+  const { user } = await getCurrentUser();
+  if (!user) redirect("/login?next=/dashboard");
+  return <Dashboard />;
 }

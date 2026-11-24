@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
 import KnowledgeUpload from "../knowledge-upload";
-import LoginForm from "../login-form";
-import { hasValidSession } from "@/lib/session";
+import { getCurrentUser } from "@/lib/auth";
 
 export default async function UploadPage() {
-  return (await hasValidSession()) ? <KnowledgeUpload /> : <LoginForm />;
+  const { user } = await getCurrentUser();
+  if (!user) redirect("/login?next=/upload");
+  return <KnowledgeUpload />;
 }
