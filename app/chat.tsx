@@ -253,6 +253,12 @@ export default function Chat({ viewer, initialConversationId, initialMessages }:
           <Link className="button-ghost" href="/analiza">
             Analiza
           </Link>
+          <Link className="button-ghost" href="/email-triage">
+            Triage
+          </Link>
+          <Link className="button-ghost" href="/misje">
+            Misje
+          </Link>
           <button type="button" className="button-ghost" onClick={handleLogout}>
             Wyloguj
           </button>
